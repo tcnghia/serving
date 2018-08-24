@@ -35,7 +35,9 @@ import (
 
 	"github.com/knative/serving/pkg/apis/serving"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
+	networkinginformers "github.com/knative/serving/pkg/client/informers/externalversions/networking/v1alpha1"
 	servinginformers "github.com/knative/serving/pkg/client/informers/externalversions/serving/v1alpha1"
+	networkinglisters "github.com/knative/serving/pkg/client/listers/networking/v1alpha1"
 	listers "github.com/knative/serving/pkg/client/listers/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/config"
@@ -57,6 +59,7 @@ type Reconciler struct {
 	revisionLister       listers.RevisionLister
 	serviceLister        corev1listers.ServiceLister
 	virtualServiceLister istiolisters.VirtualServiceLister
+	clusterIngressLister networkinglisters.ClusterIngressLister
 
 	// Domain configuration could change over time and access to domainConfig
 	// must go through domainConfigMutex
@@ -79,6 +82,7 @@ func NewController(
 	revisionInformer servinginformers.RevisionInformer,
 	serviceInformer corev1informers.ServiceInformer,
 	virtualServiceInformer istioinformers.VirtualServiceInformer,
+	clusterIngressInformer networkinginformers.ClusterIngressInformer,
 ) *controller.Impl {
 
 	// No need to lock domainConfigMutex yet since the informers that can modify
@@ -90,6 +94,7 @@ func NewController(
 		revisionLister:       revisionInformer.Lister(),
 		serviceLister:        serviceInformer.Lister(),
 		virtualServiceLister: virtualServiceInformer.Lister(),
+		clusterIngressLister: clusterIngressInformer.Lister(),
 	}
 	impl := controller.NewImpl(c, c.Logger, "Routes")
 
@@ -223,6 +228,9 @@ func (c *Reconciler) configureTraffic(ctx context.Context, r *v1alpha1.Route) (*
 		return r, nil
 	}
 	logger.Info("All referred targets are routable.  Creating Istio VirtualService.")
+	if err := c.reconcileClusterIngress(ctx, r, resources.MakeClusterIngress(r, t)); err != nil {
+		return r, err
+	}
 	if err := c.reconcileVirtualService(ctx, r, resources.MakeVirtualService(r, t)); err != nil {
 		return r, err
 	}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 
+	netv1alpha1 "github.com/knative/serving/pkg/apis/networking/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources"
 	resourcenames "github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources/names"
@@ -56,6 +57,39 @@ func (c *Reconciler) reconcileVirtualService(ctx context.Context, route *v1alpha
 		virtualService, err = c.SharedClientSet.NetworkingV1alpha3().VirtualServices(ns).Update(virtualService)
 		if err != nil {
 			logger.Error("Failed to update VirtualService", zap.Error(err))
+			return err
+		}
+	}
+
+	// TODO(mattmoor): This is where we'd look at the state of the VirtualService and
+	// reflect any necessary state into the Route.
+	return err
+}
+
+func (c *Reconciler) reconcileClusterIngress(ctx context.Context, route *v1alpha1.Route,
+	desiredClusterIngress *netv1alpha1.ClusterIngress) error {
+	logger := logging.FromContext(ctx)
+	ns := desiredClusterIngress.Namespace
+	name := desiredClusterIngress.Name
+
+	clusterIngress, err := c.clusterIngressLister.ClusterIngresses(ns).Get(name)
+	if apierrs.IsNotFound(err) {
+		clusterIngress, err = c.ServingClientSet.NetworkingV1alpha1().ClusterIngresses(ns).Create(desiredClusterIngress)
+		if err != nil {
+			logger.Error("Failed to create ClusterIngress", zap.Error(err))
+			c.Recorder.Eventf(route, corev1.EventTypeWarning, "CreationFailed",
+				"Failed to create ClusterIngress %q: %v", name, err)
+			return err
+		}
+		c.Recorder.Eventf(route, corev1.EventTypeNormal, "Created",
+			"Created ClusterIngress %q", desiredClusterIngress.Name)
+	} else if err != nil {
+		return err
+	} else if !equality.Semantic.DeepEqual(clusterIngress.Spec, desiredClusterIngress.Spec) {
+		clusterIngress.Spec = desiredClusterIngress.Spec
+		clusterIngress, err = c.ServingClientSet.NetworkingV1alpha1().ClusterIngresses(ns).Update(clusterIngress)
+		if err != nil {
+			logger.Error("Failed to update ClusterIngress", zap.Error(err))
 			return err
 		}
 	}
