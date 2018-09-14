@@ -20,7 +20,6 @@ import (
 	"github.com/knative/serving/pkg/apis/autoscaling"
 	"github.com/knative/serving/pkg/apis/serving"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
-	"github.com/knative/serving/pkg/queue"
 	"github.com/knative/serving/pkg/reconciler"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/revision/resources/names"
 
@@ -31,10 +30,10 @@ import (
 
 var (
 	servicePorts = []corev1.ServicePort{{
-		Name:       "http",
+		Name:       "http2",
 		Protocol:   corev1.ProtocolTCP,
 		Port:       ServicePort,
-		TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: queue.RequestQueuePortName},
+		TargetPort: intstr.IntOrString{Type: intstr.String, StrVal: "user-port"},
 	}}
 )
 

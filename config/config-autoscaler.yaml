@@ -62,7 +62,7 @@ data:
   concurrency-quantum-of-time: "100ms"
 
   # Scale to zero feature flag
-  enable-scale-to-zero: "true"
+  enable-scale-to-zero: "false"
 
   # Experimental: enable vertical pod autoscaling.
   # Requires a VPA installation (e.g. ./third_party/vpa/install-vpa.sh)
@@ -70,7 +70,7 @@ data:
 
   # Tick interval is the time between autoscaling calculations.
   tick-interval: "2s"
-  
+
   # Dynamic parameters (take effect when config map is updated):
 
   # Scale to zero threshold is the total time between traffic dropping to
