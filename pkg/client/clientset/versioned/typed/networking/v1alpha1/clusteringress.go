@@ -27,7 +27,7 @@ import (
 // ClusterIngressesGetter has a method to return a ClusterIngressInterface.
 // A group's client should implement this interface.
 type ClusterIngressesGetter interface {
-	ClusterIngresses(namespace string) ClusterIngressInterface
+	ClusterIngresses() ClusterIngressInterface
 }
 
 // ClusterIngressInterface has methods to work with ClusterIngress resources.
@@ -47,14 +47,12 @@ type ClusterIngressInterface interface {
 // clusterIngresses implements ClusterIngressInterface
 type clusterIngresses struct {
 	client rest.Interface
-	ns     string
 }
 
 // newClusterIngresses returns a ClusterIngresses
-func newClusterIngresses(c *NetworkingV1alpha1Client, namespace string) *clusterIngresses {
+func newClusterIngresses(c *NetworkingV1alpha1Client) *clusterIngresses {
 	return &clusterIngresses{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -62,7 +60,6 @@ func newClusterIngresses(c *NetworkingV1alpha1Client, namespace string) *cluster
 func (c *clusterIngresses) Get(name string, options v1.GetOptions) (result *v1alpha1.ClusterIngress, err error) {
 	result = &v1alpha1.ClusterIngress{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -75,7 +72,6 @@ func (c *clusterIngresses) Get(name string, options v1.GetOptions) (result *v1al
 func (c *clusterIngresses) List(opts v1.ListOptions) (result *v1alpha1.ClusterIngressList, err error) {
 	result = &v1alpha1.ClusterIngressList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Do().
@@ -87,7 +83,6 @@ func (c *clusterIngresses) List(opts v1.ListOptions) (result *v1alpha1.ClusterIn
 func (c *clusterIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Watch()
@@ -97,7 +92,6 @@ func (c *clusterIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 func (c *clusterIngresses) Create(clusterIngress *v1alpha1.ClusterIngress) (result *v1alpha1.ClusterIngress, err error) {
 	result = &v1alpha1.ClusterIngress{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		Body(clusterIngress).
 		Do().
@@ -109,7 +103,6 @@ func (c *clusterIngresses) Create(clusterIngress *v1alpha1.ClusterIngress) (resu
 func (c *clusterIngresses) Update(clusterIngress *v1alpha1.ClusterIngress) (result *v1alpha1.ClusterIngress, err error) {
 	result = &v1alpha1.ClusterIngress{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		Name(clusterIngress.Name).
 		Body(clusterIngress).
@@ -124,7 +117,6 @@ func (c *clusterIngresses) Update(clusterIngress *v1alpha1.ClusterIngress) (resu
 func (c *clusterIngresses) UpdateStatus(clusterIngress *v1alpha1.ClusterIngress) (result *v1alpha1.ClusterIngress, err error) {
 	result = &v1alpha1.ClusterIngress{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		Name(clusterIngress.Name).
 		SubResource("status").
@@ -137,7 +129,6 @@ func (c *clusterIngresses) UpdateStatus(clusterIngress *v1alpha1.ClusterIngress)
 // Delete takes name of the clusterIngress and deletes it. Returns an error if one occurs.
 func (c *clusterIngresses) Delete(name string, options *v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		Name(name).
 		Body(options).
@@ -148,7 +139,6 @@ func (c *clusterIngresses) Delete(name string, options *v1.DeleteOptions) error 
 // DeleteCollection deletes a collection of objects.
 func (c *clusterIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
 		Body(options).
@@ -160,7 +150,6 @@ func (c *clusterIngresses) DeleteCollection(options *v1.DeleteOptions, listOptio
 func (c *clusterIngresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterIngress, err error) {
 	result = &v1alpha1.ClusterIngress{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("clusteringresses").
 		SubResource(subresources...).
 		Name(name).

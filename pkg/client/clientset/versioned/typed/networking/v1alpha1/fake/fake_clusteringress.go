@@ -28,7 +28,6 @@ import (
 // FakeClusterIngresses implements ClusterIngressInterface
 type FakeClusterIngresses struct {
 	Fake *FakeNetworkingV1alpha1
-	ns   string
 }
 
 var clusteringressesResource = schema.GroupVersionResource{Group: "networking.internal.knative.dev", Version: "v1alpha1", Resource: "clusteringresses"}
@@ -38,8 +37,7 @@ var clusteringressesKind = schema.GroupVersionKind{Group: "networking.internal.k
 // Get takes name of the clusterIngress, and returns the corresponding clusterIngress object, and an error if there is any.
 func (c *FakeClusterIngresses) Get(name string, options v1.GetOptions) (result *v1alpha1.ClusterIngress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(clusteringressesResource, c.ns, name), &v1alpha1.ClusterIngress{})
-
+		Invokes(testing.NewRootGetAction(clusteringressesResource, name), &v1alpha1.ClusterIngress{})
 	if obj == nil {
 		return nil, err
 	}
@@ -49,8 +47,7 @@ func (c *FakeClusterIngresses) Get(name string, options v1.GetOptions) (result *
 // List takes label and field selectors, and returns the list of ClusterIngresses that match those selectors.
 func (c *FakeClusterIngresses) List(opts v1.ListOptions) (result *v1alpha1.ClusterIngressList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(clusteringressesResource, clusteringressesKind, c.ns, opts), &v1alpha1.ClusterIngressList{})
-
+		Invokes(testing.NewRootListAction(clusteringressesResource, clusteringressesKind, opts), &v1alpha1.ClusterIngressList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,15 +68,13 @@ func (c *FakeClusterIngresses) List(opts v1.ListOptions) (result *v1alpha1.Clust
 // Watch returns a watch.Interface that watches the requested clusterIngresses.
 func (c *FakeClusterIngresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(clusteringressesResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(clusteringressesResource, opts))
 }
 
 // Create takes the representation of a clusterIngress and creates it.  Returns the server's representation of the clusterIngress, and an error, if there is any.
 func (c *FakeClusterIngresses) Create(clusterIngress *v1alpha1.ClusterIngress) (result *v1alpha1.ClusterIngress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(clusteringressesResource, c.ns, clusterIngress), &v1alpha1.ClusterIngress{})
-
+		Invokes(testing.NewRootCreateAction(clusteringressesResource, clusterIngress), &v1alpha1.ClusterIngress{})
 	if obj == nil {
 		return nil, err
 	}
@@ -89,8 +84,7 @@ func (c *FakeClusterIngresses) Create(clusterIngress *v1alpha1.ClusterIngress) (
 // Update takes the representation of a clusterIngress and updates it. Returns the server's representation of the clusterIngress, and an error, if there is any.
 func (c *FakeClusterIngresses) Update(clusterIngress *v1alpha1.ClusterIngress) (result *v1alpha1.ClusterIngress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(clusteringressesResource, c.ns, clusterIngress), &v1alpha1.ClusterIngress{})
-
+		Invokes(testing.NewRootUpdateAction(clusteringressesResource, clusterIngress), &v1alpha1.ClusterIngress{})
 	if obj == nil {
 		return nil, err
 	}
@@ -101,8 +95,7 @@ func (c *FakeClusterIngresses) Update(clusterIngress *v1alpha1.ClusterIngress) (
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeClusterIngresses) UpdateStatus(clusterIngress *v1alpha1.ClusterIngress) (*v1alpha1.ClusterIngress, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(clusteringressesResource, "status", c.ns, clusterIngress), &v1alpha1.ClusterIngress{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(clusteringressesResource, "status", clusterIngress), &v1alpha1.ClusterIngress{})
 	if obj == nil {
 		return nil, err
 	}
@@ -112,14 +105,13 @@ func (c *FakeClusterIngresses) UpdateStatus(clusterIngress *v1alpha1.ClusterIngr
 // Delete takes name of the clusterIngress and deletes it. Returns an error if one occurs.
 func (c *FakeClusterIngresses) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(clusteringressesResource, c.ns, name), &v1alpha1.ClusterIngress{})
-
+		Invokes(testing.NewRootDeleteAction(clusteringressesResource, name), &v1alpha1.ClusterIngress{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeClusterIngresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(clusteringressesResource, c.ns, listOptions)
+	action := testing.NewRootDeleteCollectionAction(clusteringressesResource, listOptions)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ClusterIngressList{})
 	return err
@@ -128,8 +120,7 @@ func (c *FakeClusterIngresses) DeleteCollection(options *v1.DeleteOptions, listO
 // Patch applies the patch and returns the patched clusterIngress.
 func (c *FakeClusterIngresses) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.ClusterIngress, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clusteringressesResource, c.ns, name, data, subresources...), &v1alpha1.ClusterIngress{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(clusteringressesResource, name, data, subresources...), &v1alpha1.ClusterIngress{})
 	if obj == nil {
 		return nil, err
 	}

@@ -18,7 +18,3 @@ package v1alpha1
 // ClusterIngressListerExpansion allows custom methods to be added to
 // ClusterIngressLister.
 type ClusterIngressListerExpansion interface{}
-
-// ClusterIngressNamespaceListerExpansion allows custom methods to be added to
-// ClusterIngressNamespaceLister.
-type ClusterIngressNamespaceListerExpansion interface{}

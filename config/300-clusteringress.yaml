@@ -28,5 +28,5 @@ spec:
     - knative-internal
     - networking
     shortNames:
-    - kci
-  scope: Namespaced
+    - king
+  scope: Cluster

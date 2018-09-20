@@ -191,6 +191,7 @@ func main() {
 		clusteringress.NewController(
 			opt,
 			clusterIngressInformer,
+			coreServiceInformer,
 			virtualServiceInformer,
 		),
 	}

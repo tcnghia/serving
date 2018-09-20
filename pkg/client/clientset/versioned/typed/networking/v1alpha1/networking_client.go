@@ -32,8 +32,8 @@ type NetworkingV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *NetworkingV1alpha1Client) ClusterIngresses(namespace string) ClusterIngressInterface {
-	return newClusterIngresses(c, namespace)
+func (c *NetworkingV1alpha1Client) ClusterIngresses() ClusterIngressInterface {
+	return newClusterIngresses(c)
 }
 
 // NewForConfig creates a new NetworkingV1alpha1Client for the given config.

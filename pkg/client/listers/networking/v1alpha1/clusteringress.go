@@ -26,8 +26,8 @@ import (
 type ClusterIngressLister interface {
 	// List lists all ClusterIngresses in the indexer.
 	List(selector labels.Selector) (ret []*v1alpha1.ClusterIngress, err error)
-	// ClusterIngresses returns an object that can list and get ClusterIngresses.
-	ClusterIngresses(namespace string) ClusterIngressNamespaceLister
+	// Get retrieves the ClusterIngress from the index for a given name.
+	Get(name string) (*v1alpha1.ClusterIngress, error)
 	ClusterIngressListerExpansion
 }
 
@@ -49,38 +49,9 @@ func (s *clusterIngressLister) List(selector labels.Selector) (ret []*v1alpha1.C
 	return ret, err
 }
 
-// ClusterIngresses returns an object that can list and get ClusterIngresses.
-func (s *clusterIngressLister) ClusterIngresses(namespace string) ClusterIngressNamespaceLister {
-	return clusterIngressNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// ClusterIngressNamespaceLister helps list and get ClusterIngresses.
-type ClusterIngressNamespaceLister interface {
-	// List lists all ClusterIngresses in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*v1alpha1.ClusterIngress, err error)
-	// Get retrieves the ClusterIngress from the indexer for a given namespace and name.
-	Get(name string) (*v1alpha1.ClusterIngress, error)
-	ClusterIngressNamespaceListerExpansion
-}
-
-// clusterIngressNamespaceLister implements the ClusterIngressNamespaceLister
-// interface.
-type clusterIngressNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ClusterIngresses in the indexer for a given namespace.
-func (s clusterIngressNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.ClusterIngress, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ClusterIngress))
-	})
-	return ret, err
-}
-
-// Get retrieves the ClusterIngress from the indexer for a given namespace and name.
-func (s clusterIngressNamespaceLister) Get(name string) (*v1alpha1.ClusterIngress, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the ClusterIngress from the index for a given name.
+func (s *clusterIngressLister) Get(name string) (*v1alpha1.ClusterIngress, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

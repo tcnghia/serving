@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
@@ -38,13 +39,44 @@ import (
 func MakeClusterIngress(u *servingv1alpha1.Route, tc *traffic.TrafficConfig) *v1alpha1.ClusterIngress {
 	return &v1alpha1.ClusterIngress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            names.ClusterIngress(u),
-			Namespace:       u.Namespace,
-			Labels:          map[string]string{"route": u.Name},
+			GenerateName: names.ClusterIngress(u),
+			Labels: map[string]string{
+				"route":    u.Name,
+				"route-ns": u.Namespace,
+			},
 			OwnerReferences: []metav1.OwnerReference{*kmeta.NewControllerRef(u)},
 		},
 		Spec: makeClusterIngressSpec(u, tc.Targets),
 	}
+}
+
+func getRouteDomains(targetName string, u *servingv1alpha1.Route, domain string) []string {
+	var domains []string
+	if targetName == "" {
+		// Nameless traffic targets correspond to many domains: the
+		// Route.Status.Domain, and also various names of the Route's
+		// headless Service.
+		domains = []string{domain,
+			names.K8sServiceFullname(u),
+			fmt.Sprintf("%s.%s.svc", u.Name, u.Namespace),
+			fmt.Sprintf("%s.%s", u.Name, u.Namespace),
+			u.Name,
+		}
+	} else {
+		domains = []string{fmt.Sprintf("%s.%s", targetName, domain)}
+	}
+	return dedup(domains)
+}
+
+func groupInactiveTargets(targets []traffic.RevisionTarget) (active []traffic.RevisionTarget, inactive []traffic.RevisionTarget) {
+	for _, t := range targets {
+		if t.Active {
+			active = append(active, t)
+		} else {
+			inactive = append(inactive, t)
+		}
+	}
+	return active, inactive
 }
 
 func makeClusterIngressSpec(u *servingv1alpha1.Route, targets map[string][]traffic.RevisionTarget) v1alpha1.ClusterIngressSpec {
@@ -79,16 +111,16 @@ func makeClusterIngressRule(domains []string, ns string, targets []traffic.Revis
 				ServiceName:      reconciler.GetServingK8SServiceNameForObj(t.TrafficTarget.RevisionName),
 				ServicePort:      intstr.FromInt(int(revisionresources.ServicePort)),
 			},
-			Weight: float32(t.Percent) / 100,
+			Percent: t.Percent,
 		})
 	}
-	defaultTimeout := time.Second * 60
+	defaultTimeout := metav1.Duration{Duration: time.Second * 60}
 	path := v1alpha1.HTTPClusterIngressPath{
 		Backends: splits,
-		Timeout:  defaultTimeout,
+		Timeout:  &defaultTimeout,
 		Retries: &v1alpha1.HTTPRetry{
 			Attempts:      3,
-			PerTryTimeout: defaultTimeout,
+			PerTryTimeout: &defaultTimeout,
 		},
 	}
 	return &v1alpha1.ClusterIngressRule{
@@ -104,13 +136,8 @@ func makeClusterIngressRule(domains []string, ns string, targets []traffic.Revis
 }
 
 func addInactive(r *v1alpha1.HTTPClusterIngressPath, ns string, inactive []traffic.RevisionTarget) *v1alpha1.HTTPClusterIngressPath {
-	if len(inactive) == 0 {
-		// No need to change
-		return r
-	}
 	totalInactivePercent := 0
 	maxInactiveTarget := traffic.RevisionTarget{}
-
 	for _, t := range inactive {
 		totalInactivePercent += t.Percent
 		if t.Percent >= maxInactiveTarget.Percent {
@@ -118,7 +145,7 @@ func addInactive(r *v1alpha1.HTTPClusterIngressPath, ns string, inactive []traff
 		}
 	}
 	if totalInactivePercent == 0 {
-		// However, we shouldn't need to include 0% route anyway.
+		// There is actually no inactive Revisions.
 		return r
 	}
 	r.Backends = append(r.Backends, v1alpha1.ClusterIngressBackendSplit{
@@ -127,7 +154,7 @@ func addInactive(r *v1alpha1.HTTPClusterIngressPath, ns string, inactive []traff
 			ServiceName:      activator.K8sServiceName,
 			ServicePort:      intstr.FromInt(int(revisionresources.ServicePort)),
 		},
-		Weight: float32(totalInactivePercent) / 100,
+		Percent: totalInactivePercent,
 	})
 	r.AppendHeaders = map[string]string{
 		activator.RevisionHeaderName:      maxInactiveTarget.RevisionName,
@@ -135,4 +162,16 @@ func addInactive(r *v1alpha1.HTTPClusterIngressPath, ns string, inactive []traff
 		activator.RevisionHeaderNamespace: ns,
 	}
 	return r
+}
+
+func dedup(strs []string) []string {
+	existed := make(map[string]struct{})
+	unique := []string{}
+	for _, s := range strs {
+		if _, ok := existed[s]; !ok {
+			existed[s] = struct{}{}
+			unique = append(unique, s)
+		}
+	}
+	return unique
 }

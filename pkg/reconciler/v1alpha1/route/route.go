@@ -33,6 +33,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	netv1alpha1 "github.com/knative/serving/pkg/apis/networking/v1alpha1"
 	"github.com/knative/serving/pkg/apis/serving"
 	"github.com/knative/serving/pkg/apis/serving/v1alpha1"
 	networkinginformers "github.com/knative/serving/pkg/client/informers/externalversions/networking/v1alpha1"
@@ -110,20 +111,9 @@ func NewController(
 		UpdateFunc: controller.PassNew(c.EnqueueReferringRoute(impl)),
 	})
 
-	serviceInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
-		FilterFunc: controller.Filter(v1alpha1.SchemeGroupVersion.WithKind("Route")),
-		Handler: cache.ResourceEventHandlerFuncs{
-			AddFunc:    impl.EnqueueControllerOf,
-			UpdateFunc: controller.PassNew(impl.EnqueueControllerOf),
-		},
-	})
-
-	virtualServiceInformer.Informer().AddEventHandler(cache.FilteringResourceEventHandler{
-		FilterFunc: controller.Filter(v1alpha1.SchemeGroupVersion.WithKind("Route")),
-		Handler: cache.ResourceEventHandlerFuncs{
-			AddFunc:    impl.EnqueueControllerOf,
-			UpdateFunc: controller.PassNew(impl.EnqueueControllerOf),
-		},
+	clusterIngressInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    c.EnqueueOwnerRoute(impl),
+		UpdateFunc: controller.PassNew(c.EnqueueOwnerRoute(impl)),
 	})
 
 	c.Logger.Info("Setting up ConfigMap receivers")
@@ -181,10 +171,6 @@ func (c *Reconciler) reconcile(ctx context.Context, route *v1alpha1.Route) error
 	route.Status.InitializeConditions()
 
 	logger.Infof("Reconciling route :%v", route)
-	logger.Info("Creating/Updating placeholder k8s services")
-	if err := c.reconcilePlaceholderService(ctx, route); err != nil {
-		return err
-	}
 
 	// Call configureTrafficAndUpdateRouteStatus, which also updates the Route.Status
 	// to contain the domain we will use for Gateway creation.
@@ -227,17 +213,32 @@ func (c *Reconciler) configureTraffic(ctx context.Context, r *v1alpha1.Route) (*
 		// Traffic targets aren't ready, no need to configure Route.
 		return r, nil
 	}
-	logger.Info("All referred targets are routable.  Creating Istio VirtualService.")
-	if err := c.reconcileClusterIngress(ctx, r, resources.MakeClusterIngress(r, t)); err != nil {
-		return r, err
-	}
-	if err := c.reconcileVirtualService(ctx, r, resources.MakeVirtualService(r, t)); err != nil {
-		return r, err
-	}
-	logger.Info("VirtualService created, marking AllTrafficAssigned with traffic information.")
-	r.Status.Traffic = t.GetTrafficTargets()
+	logger.Info("All referred targets are routable.  Creating ClusterIngress.")
 	r.Status.MarkTrafficAssigned()
+	clusterIngress, err := c.reconcileClusterIngress(ctx, r, resources.MakeClusterIngress(r, t))
+	if err != nil {
+		return r, err
+	}
+	r.Status.PropagateClusterIngressStatus(clusterIngress.Status)
 	return r, nil
+}
+
+func (c *Reconciler) EnqueueOwnerRoute(impl *controller.Impl) func(obj interface{}) {
+	return func(obj interface{}) {
+		ing, ok := obj.(*netv1alpha1.ClusterIngress)
+		if !ok {
+			c.Logger.Infof("Ignoring non-Configuration objects %v", obj)
+			return
+		}
+		// Check whether is configuration is referred by a route.
+		routeNamespace := ing.Labels["route-ns"]
+		routeName, ok := ing.Labels["route"]
+		if !ok {
+			c.Logger.Infof("ClusterIngress %s does not have a referring route", ing.Name)
+			return
+		}
+		impl.EnqueueKey(fmt.Sprintf("%s/%s", routeNamespace, routeName))
+	}
 }
 
 func (c *Reconciler) EnqueueReferringRoute(impl *controller.Impl) func(obj interface{}) {

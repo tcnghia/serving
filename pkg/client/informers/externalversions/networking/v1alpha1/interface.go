@@ -38,5 +38,5 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 
 // ClusterIngresses returns a ClusterIngressInformer.
 func (v *version) ClusterIngresses() ClusterIngressInformer {
-	return &clusterIngressInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &clusterIngressInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

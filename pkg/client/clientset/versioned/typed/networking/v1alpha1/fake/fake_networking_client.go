@@ -25,8 +25,8 @@ type FakeNetworkingV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeNetworkingV1alpha1) ClusterIngresses(namespace string) v1alpha1.ClusterIngressInterface {
-	return &FakeClusterIngresses{c, namespace}
+func (c *FakeNetworkingV1alpha1) ClusterIngresses() v1alpha1.ClusterIngressInterface {
+	return &FakeClusterIngresses{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

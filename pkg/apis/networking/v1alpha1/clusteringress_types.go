@@ -17,15 +17,17 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"time"
+	"encoding/json"
 
-	"k8s.io/api/core/v1"
+	sapis "github.com/knative/serving/pkg/apis"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +genclient:nonNamespaced
 
 // ClusterIngress is a collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An ClusterIngress can be configured to give services
@@ -63,8 +65,31 @@ type ClusterIngressList struct {
 	Items []ClusterIngress `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+func (ci *ClusterIngress) GetGeneration() int64 {
+	return ci.Spec.Generation
+}
+
+func (ci *ClusterIngress) SetGeneration(generation int64) {
+	ci.Spec.Generation = generation
+}
+
+func (ci *ClusterIngress) GetSpecJSON() ([]byte, error) {
+	return json.Marshal(ci.Spec)
+}
+
+func (ci *ClusterIngress) GetGroupVersionKind() schema.GroupVersionKind {
+	return SchemeGroupVersion.WithKind("ClusterIngress")
+}
+
 // ClusterIngressSpec describes the ClusterIngress the user wishes to exist.
 type ClusterIngressSpec struct {
+	// TODO: Generation does not work correctly with CRD. They are scrubbed
+	// by the APIserver (https://github.com/kubernetes/kubernetes/issues/58778)
+	// So, we add Generation here. Once that gets fixed, remove this and use
+	// ObjectMeta.Generation instead.
+	// +optional
+	Generation int64 `json:"generation,omitempty"`
+
 	// A default backend capable of servicing requests that don't match any
 	// rule. At least one of 'backend' or 'rules' must be specified. This field
 	// is optional to allow the loadbalancer controller or defaulting logic to
@@ -105,11 +130,47 @@ type ClusterIngressTLS struct {
 	// TODO: Consider specifying different modes of termination, protocols etc.
 }
 
+// ConditionType represents a ClusterIngress condition value
+const (
+	// ClusterIngressConditionReady is set when the clusterIngress is configured
+	// and has a ready VirtualService.
+	ClusterIngressConditionReady = sapis.ConditionReady
+
+	// ClusterIngressConditionVirtualServiceReady is set when the ClusterIngress's underlying
+	// VirtualService have reported being Ready.
+	ClusterIngressConditionVirtualServiceReady sapis.ConditionType = "VirtualServiceReady"
+)
+
+var clusterIngressCondSet = sapis.NewLivingConditionSet(ClusterIngressConditionVirtualServiceReady)
+
 // ClusterIngressStatus describe the current state of the ClusterIngress.
 type ClusterIngressStatus struct {
-	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer v1.LoadBalancerStatus `json:"loadBalancer,omitempty" protobuf:"bytes,1,opt,name=loadBalancer"`
+	Conditions sapis.Conditions `json:"conditions,omitempty"`
+}
+
+func (cis *ClusterIngressStatus) GetCondition(t sapis.ConditionType) *sapis.Condition {
+	return clusterIngressCondSet.Manage(cis).GetCondition(t)
+}
+
+func (cis *ClusterIngressStatus) InitializeConditions() {
+	clusterIngressCondSet.Manage(cis).InitializeConditions()
+}
+
+func (cis *ClusterIngressStatus) MarkVirtualServiceReady() {
+	clusterIngressCondSet.Manage(cis).MarkTrue(ClusterIngressConditionVirtualServiceReady)
+}
+
+// GetConditions returns the Conditions array. This enables generic handling of
+// conditions by implementing the sapis.Conditions interface.
+func (cis *ClusterIngressStatus) GetConditions() sapis.Conditions {
+	return cis.Conditions
+}
+
+// SetConditions sets the Conditions array. This enables generic handling of
+// conditions by implementing the sapis.Conditions interface.
+func (cis *ClusterIngressStatus) SetConditions(conditions sapis.Conditions) {
+	cis.Conditions = conditions
 }
 
 // ClusterIngressRule represents the rules mapping the paths under a specified host to
@@ -129,7 +190,7 @@ type ClusterIngressRule struct {
 	// If the host is unspecified, the ClusterIngress routes all traffic based on the
 	// specified ClusterIngressRuleValue.
 	// +optional
-	Hosts []string `json:"host,omitempty" protobuf:"bytes,1,opt,name=host"`
+	Hosts []string `json:"hosts,omitempty" protobuf:"bytes,1,opt,name=hosts"`
 	// ClusterIngressRuleValue represents a rule to route requests for this ClusterIngressRule.
 	// If unspecified, the rule defaults to a http catch-all. Whether that sends
 	// just traffic matching the host to the default backend or all traffic to the
@@ -194,7 +255,7 @@ type HTTPClusterIngressPath struct {
 	// Timeout for HTTP requests.
 	//
 	// @knative
-	Timeout time.Duration `json:"timeout,omitempty"`
+	Timeout *metav1.Duration `json:"timeout,omitempty"`
 
 	// Retry policy for HTTP requests.
 	//
@@ -210,7 +271,7 @@ type HTTPRetry struct {
 	Attempts int `json:"attempts"`
 
 	// Timeout per retry attempt for a given request. format: 1h/1m/1s/1ms. MUST BE >=1ms.
-	PerTryTimeout time.Duration `json:"perTryTimeout"`
+	PerTryTimeout *metav1.Duration `json:"perTryTimeout"`
 }
 
 // ClusterIngressBackend describes all endpoints for a given service and port.
@@ -232,8 +293,8 @@ type ClusterIngressBackendSplit struct {
 	// Specifies the backend receiving the traffic split.
 	Backend *ClusterIngressBackend `json:"backend" protobuf:"bytes,1,opt,name=backend"`
 
-	// Specifies the split percentage, a number between 0.0 and 1.0.  Defaults to 1.0.
-	Weight float32 `json:"weight,omitempty"`
+	// Specifies the split percentage, a number between 0 and 100.  Defaults to 100.
+	Percent int `json:"percent,omitempty"`
 }
 
 // TODO(tcnghia): Check that ClusterIngress can be validated, can be defaulted, and has immutable fields.
