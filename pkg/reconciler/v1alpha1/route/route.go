@@ -25,6 +25,7 @@ import (
 	istiolisters "github.com/knative/pkg/client/listers/istio/v1alpha3"
 	"github.com/knative/pkg/controller"
 	"github.com/knative/pkg/logging"
+	resourcenames "github.com/knative/serving/pkg/reconciler/v1alpha1/route/resources/names"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -214,7 +215,10 @@ func (c *Reconciler) configureTraffic(ctx context.Context, r *v1alpha1.Route) (*
 		return r, nil
 	}
 	logger.Info("All referred targets are routable.  Creating ClusterIngress.")
+	r.Status.Traffic = t.GetTrafficTargets()
+	r.Status.DomainInternal = resourcenames.K8sServiceFullname(r)
 	r.Status.MarkTrafficAssigned()
+
 	clusterIngress, err := c.reconcileClusterIngress(ctx, r, resources.MakeClusterIngress(r, t))
 	if err != nil {
 		return r, err

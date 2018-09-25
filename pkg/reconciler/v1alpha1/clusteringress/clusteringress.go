@@ -36,7 +36,6 @@ import (
 	listers "github.com/knative/serving/pkg/client/listers/networking/v1alpha1"
 	"github.com/knative/serving/pkg/reconciler"
 	"github.com/knative/serving/pkg/reconciler/v1alpha1/clusteringress/resources"
-	"github.com/knative/serving/pkg/reconciler/v1alpha1/clusteringress/resources/names"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 )
@@ -183,23 +182,23 @@ func (c *Reconciler) reconcile(ctx context.Context, ci *v1alpha1.ClusterIngress)
 
 func (c *Reconciler) reconcilePlaceholderService(ctx context.Context, clusterIngress *v1alpha1.ClusterIngress) error {
 	logger := logging.FromContext(ctx)
-	ns := clusterIngress.Namespace
-	name := names.K8sService(clusterIngress)
 
 	desiredServices := resources.MakeK8sServices(clusterIngress)
 	for _, desiredService := range desiredServices {
-		service, err := c.serviceLister.Services(desiredService.Namespace).Get(desiredService.Name)
+		name := desiredService.Name
+		ns := desiredService.Namespace
+		service, err := c.serviceLister.Services(ns).Get(name)
 		if apierrs.IsNotFound(err) {
 			// Doesn't exist, create it.
-			service, err = c.KubeClientSet.CoreV1().Services(clusterIngress.Namespace).Create(&desiredService)
+			service, err = c.KubeClientSet.CoreV1().Services(ns).Create(&desiredService)
 			if err != nil {
-				logger.Error("Failed to create service", zap.Error(err))
+				logger.Error("Failed to create service %v+", zap.Error(err))
 				c.Recorder.Eventf(clusterIngress, corev1.EventTypeWarning, "CreationFailed",
-					"Failed to create service %q: %v", name, err)
+					"Failed to create service %s/%s: %v", ns, name, err)
 				return err
 			}
-			logger.Infof("Created service %s", name)
-			c.Recorder.Eventf(clusterIngress, corev1.EventTypeNormal, "Created", "Created service %q", name)
+			logger.Infof("Created service %s/%s", ns, name)
+			c.Recorder.Eventf(clusterIngress, corev1.EventTypeNormal, "Created", "Created service %s/%s", ns, name)
 		} else if err != nil {
 			return err
 		} else {

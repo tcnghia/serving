@@ -34,7 +34,7 @@ func MakeVirtualService(ci *v1alpha1.ClusterIngress) *v1alpha3.VirtualService {
 	return &v1alpha3.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            ci.Name,
-			Namespace:       ci.Namespace,
+			Namespace:       "knative-serving",
 			Labels:          map[string]string{"clusterIngress": ci.Name},
 			OwnerReferences: []metav1.OwnerReference{*kmeta.NewControllerRef(ci)},
 		},
@@ -100,6 +100,7 @@ func makeVirtualServiceRoute(hosts []string, pathRegExp string, http *v1alpha1.H
 			Attempts:      http.Retries.Attempts,
 			PerTryTimeout: fmt.Sprintf("%ds", int(http.Timeout.Duration.Truncate(time.Second).Seconds())),
 		},
+		AppendHeaders: http.AppendHeaders,
 	}
 }
 

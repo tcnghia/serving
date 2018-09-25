@@ -39,7 +39,7 @@ import (
 func MakeClusterIngress(u *servingv1alpha1.Route, tc *traffic.TrafficConfig) *v1alpha1.ClusterIngress {
 	return &v1alpha1.ClusterIngress{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: names.ClusterIngress(u),
+			GenerateName: fmt.Sprintf("%s-", names.ClusterIngress(u)),
 			Labels: map[string]string{
 				"route":    u.Name,
 				"route-ns": u.Namespace,
