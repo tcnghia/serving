@@ -5,7 +5,7 @@ operators require sending standard logs to **Elasticsearch**, they can install
 monitoring components by running the following at the root of the repository:
 
 ```shell
-kubectl apply -R -f config/monitoring/100-common \
+kubectl apply -R -f config/monitoring/100-namespace.yaml \
     -f config/monitoring/150-elasticsearch \
     -f third_party/config/monitoring/common \
     -f third_party/config/monitoring/elasticsearch \
@@ -25,7 +25,7 @@ a three digit prefix is added.
 * Files without any prefix can be installed in any order and they don't have any dependencies.
 * The root folder (`config/monitoring`) is special. It requires the following installation ordering:
 
-  * `/config/monitoring/100-common`
+  * `/config/monitoring/100-namespace.yaml`
   * Only one of `/config/monitoring/150-*`. File with `dev` postfix is a special
     configuration that enables verbose logging and should only be used for development
     purposes. File with `elasticsearch` or `stackdriver` indicates the logging destination.

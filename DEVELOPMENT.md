@@ -180,7 +180,7 @@ You can use two different setups for collecting logs(to Elasticsearch&Kibana) an
 1. **150-elasticsearch**: This configuration collects logs & metrics from user containers, build controller and Istio requests.
 
 ```shell
-kubectl apply -R -f config/monitoring/100-common \
+kubectl apply -R -f config/monitoring/100-namespace.yaml \
     -f config/monitoring/150-elasticsearch \
     -f third_party/config/monitoring/common \
     -f third_party/config/monitoring/elasticsearch \
@@ -191,7 +191,7 @@ kubectl apply -R -f config/monitoring/100-common \
 1. **150-elasticsearch-dev**: This configuration collects everything in (1) plus Knative Serving controller logs.
 
 ```shell
-kubectl apply -R -f config/monitoring/100-common \
+kubectl apply -R -f config/monitoring/100-namespace.yaml \
     -f config/monitoring/150-elasticsearch-dev \
     -f third_party/config/monitoring/common \
     -f third_party/config/monitoring/elasticsearch \
@@ -224,7 +224,7 @@ redeploy `Knative Serving`](./README.md#start-knative).
 You can delete all of the service components with:
 ```shell
 ko delete --ignore-not-found=true \
-  -f config/monitoring/100-common \
+  -f config/monitoring/100-namespace.yaml \
   -f config/ \
   -f ./third_party/config/build/release.yaml \
   -f ./third_party/istio-1.0.2/istio.yaml

@@ -12,7 +12,7 @@ You can use two different setups:
 user containers, build controller and Istio requests.
 
 	```shell
-	kubectl apply -R -f config/monitoring/100-common \
+	kubectl apply -R -f config/monitoring/100-namespace.yaml \
 	    -f config/monitoring/150-elasticsearch \
 	    -f third_party/config/monitoring/common \
 	    -f third_party/config/monitoring/elasticsearch \
@@ -24,7 +24,7 @@ user containers, build controller and Istio requests.
 -elasticsearch-prod** does, plus Knative Serving controller logs.
 
 	```shell
-	kubectl apply -R -f config/monitoring/100-common \
+	kubectl apply -R -f config/monitoring/100-namespace.yaml \
 	    -f config/monitoring/150-elasticsearch-dev \
 	    -f third_party/config/monitoring/common \
 	    -f third_party/config/monitoring/elasticsearch \
@@ -47,7 +47,7 @@ Then you can use two different setups:
 user containers, build controller, and Istio requests.
 
 ```shell
-kubectl apply -R -f config/monitoring/100-common \
+kubectl apply -R -f config/monitoring/100-namespace.yaml \
     -f config/monitoring/150-stackdriver-prod \
     -f third_party/config/monitoring/common \
     -f config/monitoring/200-common \
@@ -58,7 +58,7 @@ kubectl apply -R -f config/monitoring/100-common \
 -stackdriver-prod** does, plus Knative Serving controller logs.
 
 ```shell
-kubectl apply -R -f config/monitoring/100-common \
+kubectl apply -R -f config/monitoring/100-namespace.yaml \
     -f config/monitoring/150-stackdriver-dev \
     -f third_party/config/monitoring/common \
     -f config/monitoring/200-common \
@@ -373,5 +373,5 @@ Enter:
 ko delete --ignore-not-found=true \
   -f config/monitoring/200-common/100-istio.yaml \
   -f config/monitoring/200-common/100-zipkin.yaml \
-  -f config/monitoring/100-common
+  -f config/monitoring/100-namespace.yaml
 ```

@@ -145,14 +145,14 @@ cp ${OUTPUT_YAML} ${NO_MON_YAML}
 
 echo "Building Monitoring & Logging"
 # Use ko to concatenate them all together.
-ko resolve -R -f config/monitoring/100-common \
+ko resolve -R -f config/monitoring/100-namespace.yaml \
     -f config/monitoring/150-elasticsearch \
     -f third_party/config/monitoring/common \
     -f third_party/config/monitoring/elasticsearch \
     -f config/monitoring/200-common \
     -f config/monitoring/200-common/100-istio.yaml >> ${OUTPUT_YAML}
 # Use ko to do the same for the lite version.
-ko resolve -R -f config/monitoring/100-common \
+ko resolve -R -f config/monitoring/100-namespace.yaml \
     -f third_party/config/monitoring/common/istio \
     -f third_party/config/monitoring/common/kubernetes/kube-state-metrics \
     -f third_party/config/monitoring/common/prometheus-operator \
