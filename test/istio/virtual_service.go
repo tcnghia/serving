@@ -20,34 +20,40 @@ func makeVirtualService(name string, domain string) *v1alpha3.VirtualService {
 		Spec: v1alpha3.VirtualServiceSpec{
 			Hosts: []string{
 				name + "." + TestNamespace + "." + domain,
+				routeServiceName(name) + "." + TestNamespace + ".svc.cluster.local",
 			},
 			Gateways: []string{
 				"knative-ingress-gateway.knative-serving.svc.cluster.local",
 				"mesh",
 			},
 			Http: []v1alpha3.HTTPRoute{{
-				Match: makeMatch(name + "." + TestNamespace + "." + domain),
+				Match: []v1alpha3.HTTPMatchRequest{
+					makeMatch(name + "." + TestNamespace + "." + domain),
+					makeMatch(name + "." + TestNamespace + ".svc.cluster.local"),
+					makeMatch(name + "." + TestNamespace + ".svc"),
+					makeMatch(name + "." + TestNamespace),
+				},
 				Route: makeRoute(name),
-			}, {
-				Match: makeMatch(name + "." + TestNamespace + ".svc.cluster.local"),
-				Route: makeRoute(name),
-			}, {
-				Match: makeMatch(name + "." + TestNamespace + ".svc"),
-				Route: makeRoute(name),
-			}, {
-				Match: makeMatch(name + "." + TestNamespace),
-				Route: makeRoute(name),
+				Retries: &v1alpha3.HTTPRetry{
+					Attempts:      3,
+					PerTryTimeout: "10m0s",
+				},
+				AppendHeaders: map[string]string{
+					"knative-serving-namespace": "serving-tests",
+					"knative-serving-revision":  revisionServiceName(name),
+				},
+				Timeout: "10m0s",
 			}},
 		},
 	}
 }
 
-func makeMatch(host string) []v1alpha3.HTTPMatchRequest {
-	return []v1alpha3.HTTPMatchRequest{{
+func makeMatch(host string) v1alpha3.HTTPMatchRequest {
+	return v1alpha3.HTTPMatchRequest{
 		Authority: &v1alpha1.StringMatch{
 			Regex: hostRegExp(host),
 		},
-	}}
+	}
 }
 
 // hostRegExp returns an ECMAScript regular expression to match either host or host:<any port>

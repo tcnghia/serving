@@ -35,13 +35,17 @@ func TestIstioScaleTo1(t *testing.T) {
 	IstioScaleToWithin(t, 1, 60*time.Second)
 }
 
+func TestIstioScaleTo50(t *testing.T) {
+	IstioScaleToWithin(t, 50, 5*time.Minute)
+}
+
 func TestIstioScaleToN(t *testing.T) {
 	// Run each of these variations.
 	tests := []struct {
 		size    int
 		timeout time.Duration
 	}{{
-		size:    50,
+		size:    200,
 		timeout: 5 * time.Minute,
 	}}
 
