@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
@@ -27,15 +28,17 @@ func getXipDomain(clients *Clients) string {
 
 func CreateSvcDeployVirtualService(t *testing.T, clients *Clients, name string) error {
 	t.Logf("Creating Service, Deployment, VirtualService %s\n", name)
-
 	_, err := clients.KubeClient.Kube.Apps().Deployments(TestNamespace).Create(makeDeployment(name))
 	if err != nil {
 		t.Errorf("Error creating Deployment %v", err)
 	}
-
-	_, err = clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeService(name))
+	_, err = clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRevisionService(name))
 	if err != nil {
-		t.Errorf("Error creating Service %v", err)
+		t.Errorf("Error creating Revision Service %v", err)
+	}
+	_, err = clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRouteService(name))
+	if err != nil {
+		t.Errorf("Error creating Route Service %v", err)
 	}
 	xipDomain := getXipDomain(clients)
 	_, err = clients.IstioClient.VirtualServices.Create(makeVirtualService(name, xipDomain))
@@ -45,15 +48,22 @@ func CreateSvcDeployVirtualService(t *testing.T, clients *Clients, name string) 
 	return nil
 }
 
-func WaitFor200(t *testing.T, domain string, timeout time.Duration) error {
+func WaitFor200(t *testing.T, domain string, timeout time.Duration) (string, error) {
+	var msg = ""
 	err := wait.PollImmediate(WaitInterval, timeout, func() (bool, error) {
 		resp, err := http.Get(fmt.Sprintf("http://%s", domain))
+		if resp == nil {
+			return false, nil
+		}
+		defer resp.Body.Close()
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		msg = string(bodyBytes)
 		if err != nil || resp.StatusCode != http.StatusOK {
 			return false, nil
 		}
 		return true, nil
 	})
-	return err
+	return msg, err
 }
 
 func IstioScaleToWithin(t *testing.T, scale int, timeout time.Duration) {
@@ -74,13 +84,13 @@ func IstioScaleToWithin(t *testing.T, scale int, timeout time.Duration) {
 			// Send it to our cleanup logic (below)
 			cleanupCh <- name
 			_ = CreateSvcDeployVirtualService(t, clients, name)
-			if err := WaitForPod(t, name, timeout); err != nil {
+			// if err := WaitForPod(t, name, timeout); err != nil {
 
-			}
+			// }
 			start := time.Now()
 			domain := fmt.Sprintf("%s.%s.%s", name, TestNamespace, xipDomain)
-			err := WaitFor200(t, domain, timeout)
-			t.Logf("[latency]\t[%s]\t%v\t%v", name, time.Since(start), err)
+			msg, err := WaitFor200(t, domain, timeout)
+			t.Logf("[latency]\t[%s]\t%v\t%v", name, time.Since(start), msg)
 			return err
 		})
 	}

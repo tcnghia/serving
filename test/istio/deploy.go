@@ -24,11 +24,14 @@ func makeLabels(name string) map[string]string {
 	}
 }
 
-func makeContainers() []corev1.Container {
+func makeContainers(name string) []corev1.Container {
 	return []corev1.Container{{
 		Name:  "user-container",
 		Image: "tcnghia/helloworld-go:latest",
-
+		Env: []corev1.EnvVar{{
+			Name:  "TARGET",
+			Value: name,
+		}},
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -70,7 +73,7 @@ func makeDeployment(name string) *appsv1.Deployment {
 					},
 				},
 				Spec: corev1.PodSpec{
-					Containers: makeContainers(),
+					Containers: makeContainers(name),
 				},
 			},
 		},

@@ -25,6 +25,9 @@ func CleanupOnInterrupt(cleanup func()) {
 // TearDown delete the resources.
 func TearDown(t *testing.T, clients *Clients, name string) {
 	clients.KubeClient.Kube.Apps().Deployments(TestNamespace).Delete(name, &metav1.DeleteOptions{})
-	clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Delete(name, &metav1.DeleteOptions{})
+	clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Delete(
+		revisionServiceName(name), &metav1.DeleteOptions{})
+	clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Delete(
+		routeServiceName(name), &metav1.DeleteOptions{})
 	clients.IstioClient.VirtualServices.Delete(name, &metav1.DeleteOptions{})
 }

@@ -8,10 +8,31 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
-func makeService(name string) *corev1.Service {
+func revisionServiceName(name string) string {
+	return name + "-rev"
+}
+
+func routeServiceName(name string) string {
+	return name
+}
+
+func makeRouteService(name string) *corev1.Service {
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
+			Name:      routeServiceName(name),
+			Namespace: TestNamespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type:         corev1.ServiceTypeExternalName,
+			ExternalName: "istio-ingressgateway.istio-system.svc.cluster.local",
+		},
+	}
+}
+
+func makeRevisionService(name string) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      revisionServiceName(name),
 			Namespace: TestNamespace,
 		},
 		Spec: corev1.ServiceSpec{

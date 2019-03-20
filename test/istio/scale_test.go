@@ -39,8 +39,8 @@ func TestIstioScaleToN(t *testing.T) {
 		size:    1,
 		timeout: 60 * time.Second,
 	}, {
-		size:    400,
-		timeout: 10 * time.Minute,
+		size:    50,
+		timeout: 5 * time.Minute,
 	}}
 
 	for _, test := range tests {
