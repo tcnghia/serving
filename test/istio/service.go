@@ -39,7 +39,11 @@ func makeRevisionService(name string) *corev1.Service {
 			Ports: []corev1.ServicePort{{
 				Name:       "http",
 				Port:       80,
-				TargetPort: intstr.FromInt(8080),
+				TargetPort: intstr.FromString("queue-port"),
+			}, {
+				Name:       "metrics",
+				Port:       9090,
+				TargetPort: intstr.FromString("queue-metrics"),
 			}},
 			Selector: makeLabels(name),
 		},

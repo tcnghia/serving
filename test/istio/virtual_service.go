@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const VirtualServiceNamespace = "virtual-services"
+const VirtualServiceNamespace = "knative-serving"
 
 func makeVirtualService(name string, domain string) *v1alpha3.VirtualService {
 	return &v1alpha3.VirtualService{
@@ -25,7 +25,7 @@ func makeVirtualService(name string, domain string) *v1alpha3.VirtualService {
 				routeServiceName(name) + "." + TestNamespace + ".svc.cluster.local",
 			},
 			Gateways: []string{
-				"knative-ingress-gateway.knative-serving.svc.cluster.local",
+				"knative-ingress-gateway",
 				"mesh",
 			},
 			Http: []v1alpha3.HTTPRoute{{
@@ -44,7 +44,8 @@ func makeVirtualService(name string, domain string) *v1alpha3.VirtualService {
 					"knative-serving-namespace": "serving-tests",
 					"knative-serving-revision":  revisionServiceName(name),
 				},
-				Timeout: "10m0s",
+				Timeout:          "10m0s",
+				WebsocketUpgrade: true,
 			}},
 		},
 	}

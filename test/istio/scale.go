@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,36 +38,61 @@ func WaitForEndpoints(clients *Clients, endpoints string, timeout time.Duration)
 }
 
 func CreateSvcDeployVirtualService(t *testing.T, clients *Clients, name string) error {
-	t.Logf("Creating Service, Deployment, VirtualService %s\n", name)
+	// t.Logf("Creating Service, Deployment, VirtualService %s\n", name)
 	if _, err := clients.KubeClient.Kube.Apps().Deployments(TestNamespace).Create(makeDeployment(name)); err != nil {
-		t.Errorf("Error creating Deployment %v", err)
+		t.Fatalf("Error creating Deployment %v", err)
 	}
 	if _, err := clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRevisionService(name)); err != nil {
-		t.Errorf("Error creating Revision Service %v", err)
+		t.Fatalf("Error creating Revision Service %v", err)
 	}
 	// Wait for the Endpoint to have available replicas
 	if err := WaitForEndpoints(clients, revisionServiceName(name), 2*time.Minute); err != nil {
 		t.Errorf("Error waiting for Revision Service to be ready %v", err)
 	}
 	if _, err := clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRouteService(name)); err != nil {
-		t.Errorf("Error creating Route Service %v", err)
+		t.Fatalf("Error creating Route Service %v", err)
 	}
 	xipDomain := getXipDomain(clients)
 	if _, err := clients.IstioClient.VirtualServices.Create(makeVirtualService(name, xipDomain)); err != nil {
-		t.Errorf("Error creating VirtualService %v", err)
+		t.Fatalf("Error creating VirtualService %v", err)
 	}
 	return nil
 }
 
-func Probe20Times(t *testing.T, domain string) int {
-	tries := 20
-	count := 0
-	for i := 0; i < tries; i++ {
+// http.Get, ignoring DNS.
+func httpGet(domain string) (*http.Response, error) {
+	i := 0
+	for {
 		resp, err := http.Get(fmt.Sprintf("http://%s", domain))
-		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
-			count = count + 1
+		if err == nil {
+			return resp, err
 		}
-		time.Sleep(1 * time.Second)
+		msg := err.Error()
+		// Retrying for DNS.
+		if strings.Contains(msg, "no such host") || strings.Contains(msg, ":53") {
+			i = i + 1
+			if i <= 10 {
+				time.Sleep(1 * time.Second)
+				continue
+			}
+		}
+		return resp, err
+	}
+}
+
+func ProbeNTimes(t *testing.T, domain string) map[int]int {
+	tries := 40
+	count := make(map[int]int)
+	for i := 0; i < tries; i++ {
+		resp, err := httpGet(domain)
+		if err == nil && resp != nil {
+			count[resp.StatusCode] = count[resp.StatusCode] + 1
+		}
+		if resp == nil {
+			t.Logf("Unexpected error: %v", err)
+		}
+		// Every half seconds.
+		time.Sleep(500 * time.Millisecond)
 	}
 	return count
 }
@@ -102,16 +128,22 @@ func IstioScaleToWithin(t *testing.T, scale int, timeout time.Duration) {
 		i := i
 
 		wg.Go(func() error {
-			name := test.SubServiceNameForTest(t, fmt.Sprintf("%d", i))
+			name := test.SubServiceNameForTest(t, fmt.Sprintf("%03d", i))
 
 			// Send it to our cleanup logic (below)
 			cleanupCh <- name
-			_ = CreateSvcDeployVirtualService(t, clients, name)
 			start := time.Now()
+			_ = CreateSvcDeployVirtualService(t, clients, name)
+			created := time.Now()
+			createSecs := int(created.Sub(start).Seconds())
 			domain := fmt.Sprintf("%s.%s.%s", name, TestNamespace, xipDomain)
 			msg, err := WaitFor200(t, domain, timeout)
-			count := Probe20Times(t, domain)
-			t.Logf("[latency]\t[%s]\t%v\t[200:%d]\t%v", name, time.Since(start), count, msg)
+			readied := time.Now()
+			readySecs := int(readied.Sub(created).Seconds())
+			counts := ProbeNTimes(t, domain)
+			done := time.Now()
+			doneSecs := int(done.Sub(readied).Seconds())
+			t.Logf("[%s]\t%d\t%d\t%d\t[%v]\t%v", name, createSecs, readySecs, doneSecs, counts, msg)
 			return err
 		})
 	}
@@ -127,7 +159,7 @@ func IstioScaleToWithin(t *testing.T, scale int, timeout time.Duration) {
 	for {
 		select {
 		case name := <-cleanupCh:
-			t.Logf("Added %v to cleanup routine.\n", name)
+			// t.Logf("Added %v to cleanup routine.\n", name)
 			CleanupOnInterrupt(func() { TearDown(t, clients, name) })
 			defer TearDown(t, clients, name)
 		case err := <-doneCh:

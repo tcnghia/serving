@@ -52,11 +52,8 @@ func TestScaleToN(t *testing.T) {
 		size    int
 		timeout time.Duration
 	}{{
-		size:    10,
-		timeout: 60 * time.Second,
-	}, {
-		size:    50,
-		timeout: 5 * time.Minute,
+		size:    200,
+		timeout: 20 * time.Minute,
 	}}
 
 	for _, test := range tests {

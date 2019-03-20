@@ -24,18 +24,120 @@ func makeLabels(name string) map[string]string {
 	}
 }
 
-func makeContainers(name string) []corev1.Container {
-	return []corev1.Container{{
+// makeQueueContainer creates the container spec for queue sidecar.
+func makeQueueContainer(name string) corev1.Container {
+	return corev1.Container{
+		Name:  "queue-proxy",
+		Image: "gcr.io/nghia-elafros-2/queue-7204c16e44715cd30f78443fb99e0f58@sha256:e4caf20d48b59e166f9330fcefed61fd9b9ec93df171f4f03feebd7dfc11d8cb",
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("25m"),
+			},
+		},
+		Ports: []corev1.ContainerPort{{
+			ContainerPort: 8012,
+			Name:          "queue-port",
+			Protocol:      "TCP",
+		}, {
+			ContainerPort: 8022,
+			Name:          "queueadm-port",
+			Protocol:      "TCP",
+		}, {
+			ContainerPort: 9090,
+			Name:          "queue-metrics",
+			Protocol:      "TCP",
+		}},
+		ReadinessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/health",
+					Port: intstr.FromInt(8022),
+				},
+			},
+			InitialDelaySeconds: 1,
+			PeriodSeconds:       1,
+		},
+		Env: []corev1.EnvVar{{
+			Name:  "SERVING_NAMESPACE",
+			Value: TestNamespace,
+		}, {
+			Name:  "SERVING_CONFIGURATION",
+			Value: name,
+		}, {
+			Name:  "SERVING_REVISION",
+			Value: name,
+		}, {
+			Name:  "SERVING_AUTOSCALER",
+			Value: "autoscaler",
+		}, {
+			Name:  "SERVING_AUTOSCALER_PORT",
+			Value: "8080",
+		}, {
+			Name:  "CONTAINER_CONCURRENCY",
+			Value: "0",
+		}, {
+			Name:  "REVISION_TIMEOUT_SECONDS",
+			Value: "300",
+		}, {
+			Name: "SERVING_POD",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		}, {
+			Name: "SERVING_LOGGING_CONFIG",
+			Value: `{
+              "level": "info",
+              "development": false,
+              "outputPaths": ["stdout"],
+              "errorOutputPaths": ["stderr"],
+              "encoding": "json",
+              "encoderConfig": {
+                "timeKey": "ts",
+                "levelKey": "level",
+                "nameKey": "logger",
+                "callerKey": "caller",
+                "messageKey": "msg",
+                "stacktraceKey": "stacktrace",
+                "lineEnding": "",
+                "levelEncoder": "",
+                "timeEncoder": "iso8601",
+                "durationEncoder": "",
+                "callerEncoder": ""
+              }
+            }
+`,
+		}, {
+			Name:  "SERVING_LOGGING_LEVEL",
+			Value: "info",
+		}, {
+			Name:  "USER_PORT",
+			Value: "8080",
+		}, {
+			Name:  "SYSTEM_NAMESPACE",
+			Value: "knative-serving",
+		}},
+	}
+}
+
+func makeUserContainer(name string) corev1.Container {
+	return corev1.Container{
 		Name:  "user-container",
 		Image: "tcnghia/helloworld-go:latest",
 		Env: []corev1.EnvVar{{
 			Name:  "TARGET",
 			Value: name,
 		}},
+		Ports: []corev1.ContainerPort{{
+			ContainerPort: 8080,
+			Name:          "user-port",
+			Protocol:      "TCP",
+		}},
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: "?prime=10",
+					Path: "/",
 					Port: intstr.FromInt(8080),
 				},
 			},
@@ -52,7 +154,11 @@ func makeContainers(name string) []corev1.Container {
 				corev1.ResourceMemory: resource.MustParse("20Mi"),
 			},
 		},
-	}}
+	}
+}
+
+func makeContainers(name string) []corev1.Container {
+	return []corev1.Container{makeQueueContainer(name), makeUserContainer(name)}
 }
 
 func makeDeployment(name string) *appsv1.Deployment {

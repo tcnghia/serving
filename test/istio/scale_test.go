@@ -35,12 +35,24 @@ func TestIstioScaleTo1(t *testing.T) {
 	IstioScaleToWithin(t, 1, 60*time.Second)
 }
 
+func TestIstioScaleTo10(t *testing.T) {
+	IstioScaleToWithin(t, 10, 1*time.Minute)
+}
+
 func TestIstioScaleTo50(t *testing.T) {
 	IstioScaleToWithin(t, 50, 5*time.Minute)
 }
 
 func TestIstioScaleTo200(t *testing.T) {
-	IstioScaleToWithin(t, 200, 10*time.Minute)
+	IstioScaleToWithin(t, 200, 5*time.Minute)
+}
+
+func TestIstioScaleTo250(t *testing.T) {
+	IstioScaleToWithin(t, 200, 5*time.Minute)
+}
+
+func TestIstioScaleTo400(t *testing.T) {
+	IstioScaleToWithin(t, 400, 10*time.Minute)
 }
 
 func TestIstioScaleToN(t *testing.T) {
@@ -50,7 +62,7 @@ func TestIstioScaleToN(t *testing.T) {
 		timeout time.Duration
 	}{{
 		size:    200,
-		timeout: 5 * time.Minute,
+		timeout: 10 * time.Minute,
 	}}
 
 	for _, test := range tests {
