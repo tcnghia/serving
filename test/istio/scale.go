@@ -26,23 +26,33 @@ func getXipDomain(clients *Clients) string {
 	return svc.Status.LoadBalancer.Ingress[0].IP + ".xip.io"
 }
 
+func WaitForEndpoints(clients *Clients, endpoints string, timeout time.Duration) error {
+	return wait.PollImmediate(WaitInterval, timeout, func() (bool, error) {
+		ep, err := clients.KubeClient.Kube.CoreV1().Endpoints(TestNamespace).Get(endpoints, metav1.GetOptions{})
+		if err != nil || len(ep.Subsets) == 0 || len(ep.Subsets[0].Addresses) == 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 func CreateSvcDeployVirtualService(t *testing.T, clients *Clients, name string) error {
 	t.Logf("Creating Service, Deployment, VirtualService %s\n", name)
-	_, err := clients.KubeClient.Kube.Apps().Deployments(TestNamespace).Create(makeDeployment(name))
-	if err != nil {
+	if _, err := clients.KubeClient.Kube.Apps().Deployments(TestNamespace).Create(makeDeployment(name)); err != nil {
 		t.Errorf("Error creating Deployment %v", err)
 	}
-	_, err = clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRevisionService(name))
-	if err != nil {
+	if _, err := clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRevisionService(name)); err != nil {
 		t.Errorf("Error creating Revision Service %v", err)
 	}
-	_, err = clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRouteService(name))
-	if err != nil {
+	// Wait for the Endpoint to have available replicas
+	if err := WaitForEndpoints(clients, revisionServiceName(name), 2*time.Minute); err != nil {
+		t.Errorf("Error waiting for Revision Service to be ready %v", err)
+	}
+	if _, err := clients.KubeClient.Kube.CoreV1().Services(TestNamespace).Create(makeRouteService(name)); err != nil {
 		t.Errorf("Error creating Route Service %v", err)
 	}
 	xipDomain := getXipDomain(clients)
-	_, err = clients.IstioClient.VirtualServices.Create(makeVirtualService(name, xipDomain))
-	if err != nil {
+	if _, err := clients.IstioClient.VirtualServices.Create(makeVirtualService(name, xipDomain)); err != nil {
 		t.Errorf("Error creating VirtualService %v", err)
 	}
 	return nil
@@ -97,9 +107,6 @@ func IstioScaleToWithin(t *testing.T, scale int, timeout time.Duration) {
 			// Send it to our cleanup logic (below)
 			cleanupCh <- name
 			_ = CreateSvcDeployVirtualService(t, clients, name)
-			// if err := WaitForPod(t, name, timeout); err != nil {
-
-			// }
 			start := time.Now()
 			domain := fmt.Sprintf("%s.%s.%s", name, TestNamespace, xipDomain)
 			msg, err := WaitFor200(t, domain, timeout)

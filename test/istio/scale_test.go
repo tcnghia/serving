@@ -30,16 +30,18 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
+// A smoke test.
+func TestIstioScaleTo1(t *testing.T) {
+	IstioScaleToWithin(t, 1, 60*time.Second)
+}
+
 func TestIstioScaleToN(t *testing.T) {
 	// Run each of these variations.
 	tests := []struct {
 		size    int
 		timeout time.Duration
 	}{{
-		size:    1,
-		timeout: 60 * time.Second,
-	}, {
-		size:    200,
+		size:    50,
 		timeout: 5 * time.Minute,
 	}}
 
