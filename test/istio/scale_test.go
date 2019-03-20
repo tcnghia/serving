@@ -39,7 +39,7 @@ func TestIstioScaleToN(t *testing.T) {
 		size:    1,
 		timeout: 60 * time.Second,
 	}, {
-		size:    50,
+		size:    200,
 		timeout: 5 * time.Minute,
 	}}
 

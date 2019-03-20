@@ -48,6 +48,19 @@ func CreateSvcDeployVirtualService(t *testing.T, clients *Clients, name string) 
 	return nil
 }
 
+func Probe20Times(t *testing.T, domain string) int {
+	tries := 20
+	count := 0
+	for i := 0; i < tries; i++ {
+		resp, err := http.Get(fmt.Sprintf("http://%s", domain))
+		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
+			count = count + 1
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return count
+}
+
 func WaitFor200(t *testing.T, domain string, timeout time.Duration) (string, error) {
 	var msg = ""
 	err := wait.PollImmediate(WaitInterval, timeout, func() (bool, error) {
@@ -90,7 +103,8 @@ func IstioScaleToWithin(t *testing.T, scale int, timeout time.Duration) {
 			start := time.Now()
 			domain := fmt.Sprintf("%s.%s.%s", name, TestNamespace, xipDomain)
 			msg, err := WaitFor200(t, domain, timeout)
-			t.Logf("[latency]\t[%s]\t%v\t%v", name, time.Since(start), msg)
+			count := Probe20Times(t, domain)
+			t.Logf("[latency]\t[%s]\t%v\t[200:%d]\t%v", name, time.Since(start), count, msg)
 			return err
 		})
 	}
