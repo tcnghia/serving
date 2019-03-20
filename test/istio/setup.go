@@ -45,7 +45,7 @@ func NewClients(configPath string, clusterName string, namespace string) (*Clien
 	if err != nil {
 		return nil, err
 	}
-	clients.IstioClient, err = newIstioClients(cfg, namespace)
+	clients.IstioClient, err = newIstioClients(cfg, VirtualServiceNamespace)
 	if err != nil {
 		return nil, err
 	}

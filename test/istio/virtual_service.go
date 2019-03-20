@@ -11,11 +11,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const VirtualServiceNamespace = "virtual-services"
+
 func makeVirtualService(name string, domain string) *v1alpha3.VirtualService {
 	return &v1alpha3.VirtualService{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: TestNamespace,
+			Namespace: VirtualServiceNamespace,
 		},
 		Spec: v1alpha3.VirtualServiceSpec{
 			Hosts: []string{
