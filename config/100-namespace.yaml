@@ -17,5 +17,5 @@ kind: Namespace
 metadata:
   name: knative-serving
   labels:
-    istio-injection: enabled
+    istio-injection: disabled
     serving.knative.dev/release: devel

@@ -113,6 +113,7 @@ func (a *ActivationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			err := wait.ExponentialBackoff(settings, func() (bool, error) {
 				attempts++
+				logger.Info("Pod probe started")
 				probeResp, err := a.Transport.RoundTrip(probeReq)
 				if err != nil {
 					logger.Warnw("Pod probe failed", zap.Error(err))
