@@ -126,13 +126,13 @@ func (ac *ConfigValidationController) Register(ctx context.Context, kubeClient k
 		}},
 	}
 
-	// Set the owner to our deployment.
-	deployment, err := kubeClient.AppsV1().Deployments(ac.options.Namespace).Get(ac.options.DeploymentName, metav1.GetOptions{})
+	// Set the owner to our namespace.
+	namespace, err := kubeClient.CoreV1().Namespaces().Get(ac.options.Namespace, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to fetch our deployment: %v", err)
+		return fmt.Errorf("failed to fetch our namespace: %v", err)
 	}
-	deploymentRef := metav1.NewControllerRef(deployment, deploymentKind)
-	webhook.OwnerReferences = append(webhook.OwnerReferences, *deploymentRef)
+	namespaceRef := metav1.NewControllerRef(namespace, namespaceKind)
+	webhook.OwnerReferences = append(webhook.OwnerReferences, *namespaceRef)
 
 	// Try to create the webhook and if it already exists validate webhook rules.
 	_, err = client.Create(webhook)
