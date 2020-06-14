@@ -27,6 +27,7 @@ spec:
   template:
     metadata:
       annotations:
+        sidecar.istio.io/inject: "false"
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
       labels:
         app: webhook

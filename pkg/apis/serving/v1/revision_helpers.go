@@ -94,18 +94,11 @@ func (r *Revision) IsReachable() bool {
 
 // GetProtocol returns the app level network protocol.
 func (r *Revision) GetProtocol() (p net.ProtocolType) {
-	p = net.ProtocolHTTP1
 
-	ports := r.Spec.GetContainer().Ports
-	if len(ports) <= 0 {
-		return
-	}
-
-	if ports[0].Name == string(net.ProtocolH2C) {
-		p = net.ProtocolH2C
-	}
-
-	return
+	// Since we know how to downgrade from HTTP/2 to HTTP/1 in queue-proxy, we should
+	// always declare our intention to take HTTP/2 traffic, no matter what the port
+	// name is.
+	return net.ProtocolH2C
 }
 
 // SetLastPinned sets the revision's last pinned annotations

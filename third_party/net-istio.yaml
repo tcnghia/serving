@@ -372,6 +372,7 @@ spec:
     metadata:
       annotations:
         cluster-autoscaler.kubernetes.io/safe-to-evict: "false"
+        sidecar.istio.io/inject: "false"
       labels:
         app: istio-webhook
         role: istio-webhook

@@ -37,8 +37,22 @@ type State struct {
 	shuttingDown bool
 	mutex        sync.RWMutex
 
+	http2          *bool
 	drainCh        chan struct{}
 	drainCompleted bool
+}
+
+func (h *State) IsHTTP2() *bool {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+
+	return h.http2
+}
+
+func (h *State) SetHTTP2(http2 bool) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.http2 = &http2
 }
 
 // IsAlive returns whether or not the health server is in a known

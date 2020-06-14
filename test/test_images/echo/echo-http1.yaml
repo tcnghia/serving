@@ -1,10 +1,12 @@
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: grpc-ping
+  name: httpbin
   namespace: default
 spec:
   template:
     spec:
       containers:
-      - image: ko://knative.dev/serving/test/test_images/grpc-ping
+      - image: ko://knative.dev/serving/test/test_images/echo
+        args:
+        - --http2=false

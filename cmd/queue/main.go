@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net"
@@ -100,6 +101,41 @@ type config struct {
 	TracingConfigStackdriverProjectID string                    `split_words:"true"` // optional
 }
 
+// TODO: This function does not belong here, probably should be in pkg.
+//
+// Provides an 'automatic downgrading' transport.
+//
+// (1) when health.State.Protocol == HTTP2, use the AutoTransport unmodified.
+//
+// (2) when health.State.Protocol isn't:
+//     - a request will be downgraded to HTTP1 and send through the AutoTransport (thus taking the HTTP1 code path and wire formate).
+//     - the response from that request will be then have the protocol version converted back to HTTP2 before sending back.
+func autoDowngradingTransport(healthState *health.State) http.RoundTripper {
+	t := pkgnet.AutoTransport
+	return pkgnet.RoundTripperFunc(func(r *http.Request) (*http.Response, error) {
+
+		// Can the user container handle HTTP2 request?
+		isHTTP2 := healthState.IsHTTP2()
+
+		// If the user-container can handle HTTP2, we pass through the request as-is.
+		if isHTTP2 != nil && *isHTTP2 {
+			return t.RoundTrip(r)
+		}
+
+		// Otherwise, save the request HTTP version and downgrade it to HTTP1 before sending.
+		version := r.ProtoMajor
+		r.ProtoMajor = 1
+		resp, err := t.RoundTrip(r)
+
+		// Restore the request & response HTTP version before sending back.
+		r.ProtoMajor = version
+		if resp != nil {
+			resp.ProtoMajor = version
+		}
+		return resp, err
+	})
+}
+
 // Make handler a closure for testing.
 func proxyHandler(breaker *queue.Breaker, stats *network.RequestStats, tracingEnabled bool, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -149,8 +185,69 @@ func proxyHandler(breaker *queue.Breaker, stats *network.RequestStats, tracingEn
 	}
 }
 
+// Send an OPTIONS request to the user-container, with the Upgrade=h2c header.
+//
+// If we receive a HTTP 101 (SWITCHING PROTOCOLS),  the user-container _can_ support HTTP/2.
+// If we receive any other HTTP response, the user-container can only support HTTP/1
+func checkHTTP2() (*bool, error) {
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+	url := url.URL{
+		Scheme: "http",
+		Host:   "localhost:8080",
+		Path:   "/",
+	}
+	req, err := http.NewRequest(http.MethodOptions, url.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error constructing probe request %w", err)
+	}
+
+	// An upgrade will need to have at least these 3 headers.
+	req.Header.Add("Connection", "Upgrade, HTTP2-Settings")
+	req.Header.Add("Upgrade", "h2c")
+	req.Header.Add("HTTP2-Settings", "")
+
+	// This is not strictly required, but nice to have.
+	req.Header.Add(network.UserAgentKey, network.KubeProbeUAPrefix)
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	isHTTP2 := false
+
+	// TODO: check the Upgrade response header to be more certain.
+	if res.StatusCode == http.StatusSwitchingProtocols {
+		isHTTP2 = true
+	}
+	return &isHTTP2, nil
+}
+
 func knativeProbeHandler(healthState *health.State, prober func() bool, isAggressive bool, tracingEnabled bool, next http.Handler, logger *zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		// We only check for HTTP/2 capacity once, if the capacity is confirmed or denied we won't check again.
+		if healthState.IsHTTP2() == nil {
+			isHTTP2, err := checkHTTP2()
+			if err != nil || isHTTP2 == nil {
+				http.Error(w, "fail to check protocol", http.StatusInternalServerError)
+				return
+			}
+			if *isHTTP2 {
+				logger.Infof("HTTP2 container detected. Happy!")
+			} else {
+				logger.Infof("HTTP1 container detected. WTF!")
+			}
+			healthState.SetHTTP2(*isHTTP2)
+		}
 		ph := network.KnativeProbeHeader(r)
 
 		if ph == "" {
@@ -320,7 +417,7 @@ func buildServer(env config, healthState *health.State, rp *readiness.Probe, sta
 	}
 
 	httpProxy := httputil.NewSingleHostReverseProxy(target)
-	httpProxy.Transport = buildTransport(env, logger)
+	httpProxy.Transport = buildTransport(env, healthState, logger)
 	httpProxy.ErrorHandler = pkgnet.ErrorHandler(logger)
 	httpProxy.BufferPool = network.NewBufferPool()
 	httpProxy.FlushInterval = -1
@@ -357,9 +454,9 @@ func buildServer(env config, healthState *health.State, rp *readiness.Probe, sta
 	return pkgnet.NewServer(":"+strconv.Itoa(env.QueueServingPort), composedHandler)
 }
 
-func buildTransport(env config, logger *zap.SugaredLogger) http.RoundTripper {
+func buildTransport(env config, healthState *health.State, logger *zap.SugaredLogger) http.RoundTripper {
 	if env.TracingConfigBackend == tracingconfig.None {
-		return pkgnet.AutoTransport
+		return autoDowngradingTransport(healthState)
 	}
 
 	oct := tracing.NewOpenCensusTracer(tracing.WithExporter(env.ServingPod, logger))
@@ -372,7 +469,7 @@ func buildTransport(env config, logger *zap.SugaredLogger) http.RoundTripper {
 	})
 
 	return &ochttp.Transport{
-		Base: pkgnet.AutoTransport,
+		Base: autoDowngradingTransport(healthState),
 	}
 }
 
