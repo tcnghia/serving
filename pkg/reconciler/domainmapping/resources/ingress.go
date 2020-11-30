@@ -28,12 +28,54 @@ import (
 	servingv1alpha1 "knative.dev/serving/pkg/apis/serving/v1alpha1"
 )
 
+// MakeIngressTLS creates IngressTLS to configure the ingress TLS.
+func MakeIngressTLS(cert *netv1alpha1.Certificate, hostNames []string) netv1alpha1.IngressTLS {
+	return netv1alpha1.IngressTLS{
+		Hosts:           hostNames,
+		SecretName:      cert.Spec.SecretName,
+		SecretNamespace: cert.Namespace,
+	}
+}
+
+func getChallengeHosts(challenges []netv1alpha1.HTTP01Challenge) map[string]netv1alpha1.HTTP01Challenge {
+	c := make(map[string]netv1alpha1.HTTP01Challenge, len(challenges))
+
+	for _, challenge := range challenges {
+		c[challenge.URL.Host] = challenge
+	}
+
+	return c
+}
+
+func makeACMEIngressPaths(challenges map[string]netv1alpha1.HTTP01Challenge, domain string) []netv1alpha1.HTTPIngressPath {
+	paths := make([]netv1alpha1.HTTPIngressPath, 0, len(challenges))
+	challenge, ok := challenges[domain]
+	if !ok {
+		return nil
+	}
+
+	paths = append(paths, netv1alpha1.HTTPIngressPath{
+		Splits: []netv1alpha1.IngressBackendSplit{{
+			IngressBackend: netv1alpha1.IngressBackend{
+				ServiceNamespace: challenge.ServiceNamespace,
+				ServiceName:      challenge.ServiceName,
+				ServicePort:      challenge.ServicePort,
+			},
+			Percent: 100,
+		}},
+		Path: challenge.URL.Path,
+	})
+	return paths
+}
+
 // MakeIngress creates an Ingress object for a DomainMapping.  The Ingress is
 // always created in the same namespace as the DomainMapping, and the ingress
 // backend is always in the same namespace also (as this is required by
 // KIngress).  The created ingress will contain a RewriteHost rule to cause the
 // given hostName to be used as the host.
-func MakeIngress(dm *servingv1alpha1.DomainMapping, backendServiceName, hostName, ingressClass string) *netv1alpha1.Ingress {
+func MakeIngress(dm *servingv1alpha1.DomainMapping, backendServiceName, hostName, ingressClass string, tls []netv1alpha1.IngressTLS, acmeChallenges ...netv1alpha1.HTTP01Challenge) *netv1alpha1.Ingress {
+	challengeHosts := getChallengeHosts(acmeChallenges)
+
 	return &netv1alpha1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kmeta.ChildName(dm.GetName(), ""),
@@ -50,7 +92,7 @@ func MakeIngress(dm *servingv1alpha1.DomainMapping, backendServiceName, hostName
 				Hosts:      []string{dm.Name},
 				Visibility: netv1alpha1.IngressVisibilityExternalIP,
 				HTTP: &netv1alpha1.HTTPIngressRuleValue{
-					Paths: []netv1alpha1.HTTPIngressPath{{
+					Paths: append([]netv1alpha1.HTTPIngressPath{{
 						RewriteHost: hostName,
 						Splits: []netv1alpha1.IngressBackendSplit{{
 							Percent: 100,
@@ -63,9 +105,10 @@ func MakeIngress(dm *servingv1alpha1.DomainMapping, backendServiceName, hostName
 								ServicePort:      intstr.FromInt(80),
 							},
 						}},
-					}},
+					}}, makeACMEIngressPaths(challengeHosts, dm.Status.URL.Host)...),
 				},
 			}},
+			TLS: tls,
 		},
 	}
 }
